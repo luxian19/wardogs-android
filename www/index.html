@@ -716,13 +716,13 @@ body.lobby-mode #hud {display:none!important}
     const sound = new SoundEngine();
 
     // ==========================================
-    // 2. GAME CONFIGURATION & WEAPON ARMORY (420x420 FOREST ARENA)
+    // 2. GAME CONFIGURATION & WEAPON ARMORY (620x620 FOREST ARENA)
     // ==========================================
-    const ARENA_HALF_SIZE = 200; // 400x400 playable bounds inside 420x420 forest terrain
+    const ARENA_HALF_SIZE = 290; // 580x580 playable bounds inside 620x620 forest terrain
     const FACTIONS = {
-      blue: { name: 'COBALT PMC', short: 'BLUE', colorHex: 0x3b82f6, css: 'text-blue-400', spawn: new THREE.Vector3(0, 2, 135) },
-      red:  { name: 'KRASNY CORPS', short: 'RED', colorHex: 0xef4444, css: 'text-red-400', spawn: new THREE.Vector3(-125, 2, -105) },
-      gold: { name: 'AURELIA SYNDICATE', short: 'GOLD', colorHex: 0xf59e0b, css: 'text-amber-400', spawn: new THREE.Vector3(125, 2, -105) }
+      blue: { name: 'COBALT PMC', short: 'BLUE', colorHex: 0x3b82f6, css: 'text-blue-400', spawn: new THREE.Vector3(0, 2, 205) },
+      red:  { name: 'KRASNY CORPS', short: 'RED', colorHex: 0xef4444, css: 'text-red-400', spawn: new THREE.Vector3(-185, 2, -175) },
+      gold: { name: 'AURELIA SYNDICATE', short: 'GOLD', colorHex: 0xf59e0b, css: 'text-amber-400', spawn: new THREE.Vector3(185, 2, -175) }
     };
 
     const ARMORY = [
@@ -903,7 +903,7 @@ body.lobby-mode #hud {display:none!important}
     // Overcast moody forest sky & atmospheric mist
     const overcastColor = 0x566473;
     scene.background = new THREE.Color(overcastColor);
-    scene.fog = new THREE.FogExp2(overcastColor, 0.0052);
+    scene.fog = new THREE.FogExp2(overcastColor, 0.0038);
 
     const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 750);
     camera.rotation.order = 'YXZ';
@@ -919,8 +919,8 @@ body.lobby-mode #hud {display:none!important}
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     dirLight.shadow.camera.near = 10;
-    dirLight.shadow.camera.far = 450;
-    const d = 175;
+    dirLight.shadow.camera.far = 650;
+    const d = 300;
     dirLight.shadow.camera.left = -d;
     dirLight.shadow.camera.right = d;
     dirLight.shadow.camera.top = d;
@@ -1047,7 +1047,7 @@ body.lobby-mode #hud {display:none!important}
       }
 
       const skyTex = new THREE.CanvasTexture(cloudCanvas);
-      const skyGeo = new THREE.SphereGeometry(340, 24, 16);
+      const skyGeo = new THREE.SphereGeometry(520, 24, 16);
       const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false });
       const skyDome = new THREE.Mesh(skyGeo, skyMat);
       scene.add(skyDome);
@@ -1056,7 +1056,7 @@ body.lobby-mode #hud {display:none!important}
     function createExpandedForestMap() {
       createOvercastSkyDome();
 
-      // Procedural Mossy Forest Floor Texture (420 x 420)
+      // Procedural Mossy Forest Floor Texture (620 x 620)
       const groundCanvas = document.createElement('canvas');
       groundCanvas.width = 512;
       groundCanvas.height = 512;
@@ -1073,9 +1073,9 @@ body.lobby-mode #hud {display:none!important}
       const groundTex = new THREE.CanvasTexture(groundCanvas);
       groundTex.wrapS = THREE.RepeatWrapping;
       groundTex.wrapT = THREE.RepeatWrapping;
-      groundTex.repeat.set(36, 36);
+      groundTex.repeat.set(50, 50);
 
-      const groundGeo = new THREE.PlaneGeometry(440, 440);
+      const groundGeo = new THREE.PlaneGeometry(620, 620);
       const groundMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.95, metalness: 0.04 });
       const ground = new THREE.Mesh(groundGeo, groundMat);
       ground.rotation.x = -Math.PI / 2;
@@ -1104,16 +1104,16 @@ body.lobby-mode #hud {display:none!important}
         return mesh;
       };
 
-      addStaticBox(0, 6, -202, 408, 12, 4);
-      addStaticBox(0, 6, 202, 408, 12, 4);
-      addStaticBox(-202, 6, 0, 4, 12, 408);
-      addStaticBox(202, 6, 0, 4, 12, 408);
+      addStaticBox(0, 6, -292, 588, 12, 4);
+      addStaticBox(0, 6, 292, 588, 12, 4);
+      addStaticBox(-292, 6, 0, 4, 12, 588);
+      addStaticBox(292, 6, 0, 4, 12, 588);
 
       // Distant Misty Forest Mountains
       const mountainMat = new THREE.MeshStandardMaterial({ color: 0x26313a, roughness: 1 });
       for (let i = 0; i < 44; i++) {
         const angle = (i / 44) * Math.PI * 2;
-        const dist = 240 + (i % 5) * 24;
+        const dist = 340 + (i % 5) * 24;
         const radius = 44 + (i % 5) * 14;
         const height = 65 + (i % 6) * 18;
         const peak = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 7), mountainMat);
@@ -1122,7 +1122,7 @@ body.lobby-mode #hud {display:none!important}
         scene.add(peak);
       }
 
-      // Procedural Pine & Birch Forest Trees across the 400x400 map
+      // Procedural Pine & Birch Forest Trees across the 580x580 map
       const pineTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3b281c, roughness: 0.9 });
       const birchTrunkMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.85 });
       const pineFoliageDark = new THREE.MeshStandardMaterial({ color: 0x163020, roughness: 0.85 });
@@ -1136,9 +1136,9 @@ body.lobby-mode #hud {display:none!important}
         return (seed - 1) / 2147483646;
       };
 
-      for (let i = 0; i < 190; i++) {
-        const tx = (rand() - 0.5) * 375;
-        const tz = (rand() - 0.5) * 375;
+      for (let i = 0; i < 300; i++) {
+        const tx = (rand() - 0.5) * 550;
+        const tz = (rand() - 0.5) * 550;
 
         // Keep central Control Zone clearing open (radius > 23)
         if (Math.hypot(tx, tz) < 23) continue;
@@ -1562,6 +1562,8 @@ body.lobby-mode #hud {display:none!important}
       lobbyUI.classList.remove('hidden');
       state.isLobby = true;
       state.isPlaying = false;
+      arenaSceneObjects.forEach(obj => { obj.visible = false; });
+      lobbyGroup.visible = true;
       document.body.classList.add('lobby-mode');
       camera.position.set(0,1.75,22);
       camera.rotation.set(0,0,0);
@@ -1611,6 +1613,8 @@ body.lobby-mode #hud {display:none!important}
       document.body.classList.remove('lobby-mode');
       mobileControls.classList.add('hidden');
       if(document.pointerLockElement) document.exitPointerLock();
+      arenaSceneObjects.forEach(obj => { obj.visible = true; });
+      lobbyGroup.visible = false;
       respawnPlayer();
       deployBtn.click();
     });
@@ -2041,7 +2045,7 @@ body.lobby-mode #hud {display:none!important}
         ctx.stroke();
       }
 
-      // Arena is 400x400 (-200 to +200)
+      // Arena is 580x580 (-290 to +290)
       const scale = width / (ARENA_HALF_SIZE * 2);
       const toRadarX = (x) => width / 2 + x * scale;
       const toRadarY = (z) => height / 2 + z * scale;
