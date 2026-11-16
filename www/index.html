@@ -90,6 +90,7 @@
  position:fixed;inset:0;z-index:50;color:white;
  font-family:Arial,sans-serif;
 }
+#lobby-main-menu.hidden {display:none!important}
 #lobby-main-menu {
  display:flex;flex-direction:column;justify-content:center;
  padding:32px;
@@ -154,6 +155,13 @@ body.lobby-mode #hud {display:none!important}
   <button id="lobby-battle" class="lobby-btn primary">⚔ BATTLE</button>
  </div>
  <div id="lobby-toast"></div>
+</div>
+<div id="lobby-interaction" class="hidden" style="position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.78);display:none;align-items:center;justify-content:center;padding:20px;color:white">
+ <div style="position:relative;width:min(420px,100%);background:#101c2b;border:1px solid #d97706;border-radius:16px;padding:28px">
+  <button id="lobby-interaction-close" aria-label="Close" style="position:absolute;right:12px;top:10px;font-size:28px;color:#fbbf24;background:none;border:0;padding:4px 10px">✕</button>
+  <h2 id="lobby-interaction-title" style="font-size:21px;font-weight:bold;color:#f59e0b;margin:12px 0">FACILITY</h2>
+  <p id="lobby-interaction-message" style="color:#cbd5e1">Coming Soon</p>
+ </div>
 </div>
 
   <!-- Damage Vignette Flash -->
@@ -432,7 +440,8 @@ body.lobby-mode #hud {display:none!important}
 
   <!-- START / PAUSE / LOADOUT SHOP OVERLAY -->
   <div id="menu-overlay" class="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
-    <div class="tactical-panel w-full max-w-4xl rounded-2xl p-5 sm:p-8 border border-amber-500/30 shadow-2xl my-auto">
+    <div class="tactical-panel relative w-full max-w-4xl rounded-2xl p-5 sm:p-8 border border-amber-500/30 shadow-2xl my-auto">
+      <button id="close-lobby-shop" type="button" aria-label="Close shop" class="absolute right-3 top-3 z-10 rounded-lg border border-amber-500/60 bg-slate-900 px-3 py-1 text-xl font-black text-amber-400">✕</button>
       
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-700/80">
@@ -1572,10 +1581,28 @@ body.lobby-mode #hud {display:none!important}
       openTacticalShop('WEAPON SHOP • Select your tactical weapon loadout.');
     });
 
+    function showLobbyInteraction(id) {
+      const names = {equipment:'EQUIPMENT SHOP',operator:'OPERATOR',inventory:'INVENTORY',missions:'MISSIONS'};
+      document.getElementById('lobby-interaction-title').textContent = names[id] || id.toUpperCase();
+      document.getElementById('lobby-interaction-message').textContent = 'COMING SOON';
+      const panel = document.getElementById('lobby-interaction');
+      panel.classList.remove('hidden');
+      panel.style.display = 'flex';
+    }
+
+    function closeLobbyInteraction() {
+      const panel = document.getElementById('lobby-interaction');
+      panel.classList.add('hidden');
+      panel.style.display = 'none';
+    }
+
+    document.getElementById('lobby-interaction-close').addEventListener('click', closeLobbyInteraction);
+    document.getElementById('lobby-interaction').addEventListener('click', e => {
+      if (e.target.id === 'lobby-interaction') closeLobbyInteraction();
+    });
+
     ['equipment','operator','inventory','missions'].forEach(id=>{
-      document.getElementById('lobby-'+id).addEventListener('click',()=>{
-        showLobbyToast(id.toUpperCase()+' • COMING SOON');
-      });
+      document.getElementById('lobby-'+id).addEventListener('click',()=>showLobbyInteraction(id));
     });
 
     document.getElementById('lobby-battle').addEventListener('click',()=>{
@@ -1699,6 +1726,8 @@ body.lobby-mode #hud {display:none!important}
     }
 
     function openTacticalShop(bannerMessage = null) {
+      window.__lobbyShopOpen = !!state.isLobby;
+      if (window.__lobbyShopOpen) lobbyUI.classList.add('hidden');
       state.isPlaying = false;
       state.isMouseDown = false;
       setAiming(false);
@@ -2506,6 +2535,16 @@ body.lobby-mode #hud {display:none!important}
     // ==========================================
     // 13. DESKTOP INPUT EVENT LISTENERS
     // ==========================================
+    document.getElementById('close-lobby-shop').addEventListener('click', () => {
+      menuOverlay.classList.add('hidden');
+      if (window.__lobbyShopOpen && state.isLobby) {
+        lobbyUI.classList.remove('hidden');
+        window.__lobbyShopOpen = false;
+      } else {
+        deployBtn.click();
+      }
+    });
+
     deployBtn.addEventListener('click', () => {
       sound.init();
       if (state.isDead) {
