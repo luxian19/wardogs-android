@@ -5,3 +5,13 @@ android/app/build/
 .idea/
 .DS_Store
 *.log
+
+# Local backups and diagnostic outputs
+*.backup
+*.backup-*
+*.before-*
+*.bak
+*.settings-backup
+.syntax-check/
+terrain-review-*/
+*.bak-*
