@@ -2004,6 +2004,7 @@ document.body.appendChild(soldierDebugPanel);
     const grassChunks = new Map();
     const grassVisibleKeys = new Set();
     let grassPendingChunks = [];
+    let grassPendingIndex = 0;
 
     const grassMeshes = [];
     const grassGeometries = [];
@@ -2015,6 +2016,9 @@ document.body.appendChild(soldierDebugPanel);
     const grassDummy = new THREE.Object3D();
     const grassUp = new THREE.Vector3(0, 1, 0);
     const grassNormal = new THREE.Vector3();
+    const grassVertex = new THREE.Vector3();
+    const grassVertexNormal = new THREE.Vector3();
+    const grassNormalMatrix = new THREE.Matrix3();
     const grassYaw = new THREE.Quaternion();
     const grassColor = new THREE.Color();
     const grassMatrix = new THREE.Matrix4();
@@ -2168,13 +2172,12 @@ document.body.appendChild(soldierDebugPanel);
           grassDummy.scale.set(width, height, width);
           grassDummy.updateMatrix();
 
-          const geometry = sourceGeometry.clone();
-          geometry.applyMatrix4(grassDummy.matrix);
-
-          const pos = geometry.getAttribute('position');
-          const norm = geometry.getAttribute('normal');
-          const uv = geometry.getAttribute('uv');
-          const index = geometry.getIndex();
+          // Transform langsung dari geometri sumber tanpa clone sementara.
+          const pos = sourceGeometry.getAttribute('position');
+          const norm = sourceGeometry.getAttribute('normal');
+          const uv = sourceGeometry.getAttribute('uv');
+          const index = sourceGeometry.getIndex();
+          grassNormalMatrix.getNormalMatrix(grassDummy.matrix);
 
           const tint = grassRandom(seed + 6);
           const redTint = 0.72 + tint * 0.28;
@@ -2182,10 +2185,18 @@ document.body.appendChild(soldierDebugPanel);
           const blueTint = 0.68 + grassRandom(seed + 8) * 0.27;
 
           for (let i = 0; i < pos.count; i++) {
-            positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+            grassVertex.fromBufferAttribute(pos, i);
+            grassVertex.applyMatrix4(grassDummy.matrix);
+            positions.push(grassVertex.x, grassVertex.y, grassVertex.z);
 
             if (norm) {
-              normals.push(norm.getX(i), norm.getY(i), norm.getZ(i));
+              grassVertexNormal.fromBufferAttribute(norm, i);
+              grassVertexNormal.applyMatrix3(grassNormalMatrix).normalize();
+              normals.push(
+                grassVertexNormal.x,
+                grassVertexNormal.y,
+                grassVertexNormal.z
+              );
             } else {
               normals.push(0, 1, 0);
             }
@@ -2210,7 +2221,6 @@ document.body.appendChild(soldierDebugPanel);
           }
 
           vertexOffset += pos.count;
-          geometry.dispose();
         }
       }
 
@@ -2317,9 +2327,14 @@ document.body.appendChild(soldierDebugPanel);
           throw new Error('Material asli GLB tidak ditemukan');
         }
 
-        // TEMPORARY VISIBILITY TEST: bypass PBR and alpha textures.
+        // WARDOGS OPTIMIZED GRASS: alpha clipping, no transparent blending.
         grassSharedMaterial = new THREE.MeshBasicMaterial({
-          color: 0x55aa33,
+          color: 0xffffff,
+          map: grassDiffuseTexture,
+          alphaMap: grassAlphaTexture,
+          alphaTest: 0.48,
+          transparent: false,
+          depthWrite: true,
           side: THREE.DoubleSide,
           vertexColors: true
         });
@@ -2357,7 +2372,7 @@ document.body.appendChild(soldierDebugPanel);
         console.log(
           '[WARDOGS] GLB grass loaded:',
           sourceMeshes.length,
-          'variants; PBR + external 4K alpha'
+          'variants; alpha-tested 4K grass textures'
         );
 
       }).catch(error => {
@@ -2398,13 +2413,18 @@ document.body.appendChild(soldierDebugPanel);
 
         grassVisibleKeys.clear();
         grassPendingChunks = [];
+        grassPendingIndex = 0;
 
-        // Scan seluruh grid dunia.
-        // Kandidat ditentukan oleh frustum, jarak kamera dan terrain occlusion.
-        // Tidak memakai radius pemain/kamera sebagai batas pencarian chunk.
+        // Broadphase kandidat berdasarkan jarak render kamera.
+        // Frustum dan terrain occlusion tetap menentukan visibilitas.
+        const scanRange = GRASS_RENDER_DISTANCE + GRASS_CHUNK_SIZE;
+        const minCX = Math.max(-31, Math.floor((camera.position.x - scanRange) / GRASS_CHUNK_SIZE));
+        const maxCX = Math.min(30, Math.floor((camera.position.x + scanRange) / GRASS_CHUNK_SIZE));
+        const minCZ = Math.max(-31, Math.floor((camera.position.z - scanRange) / GRASS_CHUNK_SIZE));
+        const maxCZ = Math.min(30, Math.floor((camera.position.z + scanRange) / GRASS_CHUNK_SIZE));
 
-        for (let cz = -31; cz <= 30; cz++) {
-          for (let cx = -31; cx <= 30; cx++) {
+        for (let cz = minCZ; cz <= maxCZ; cz++) {
+          for (let cx = minCX; cx <= maxCX; cx++) {
             if (!grassChunkInView(cx, cz)) continue;
 
             const key = cx + ',' + cz;
@@ -2432,8 +2452,8 @@ document.body.appendChild(soldierDebugPanel);
       // Bangun maksimal empat chunk per frame agar tidak membuat lonjakan CPU.
       let built = 0;
 
-      while (grassPendingChunks.length && built < 4) {
-        const next = grassPendingChunks.shift();
+      while (grassPendingIndex < grassPendingChunks.length && built < 4) {
+        const next = grassPendingChunks[grassPendingIndex++];
         buildGrassChunk(next[0], next[1]);
         built++;
       }
