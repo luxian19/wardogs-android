@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>WARDOGS Asset Preview</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#15191d;font-family:Arial;color:white;touch-action:none}
+#info{position:fixed;top:12px;left:12px;right:12px;z-index:5;background:#111c;padding:12px;border-radius:8px;font-size:13px}
+#names{position:fixed;bottom:12px;left:0;right:0;text-align:center;font-size:12px;color:#ddd;z-index:5}
+canvas{display:block}
+</style>
+</head>
+<body>
+<div id="info">WARDOGS — Memuat aset 3D: 0/3</div>
+<div id="names">Fortified Outpost · Scots Pine · Sandbag Wall</div>
+
+<script src="../../../../vendor/three.min.js"></script>
+<script src="../../../../vendor/GLTFLoader.js"></script>
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x68747c);
+
+const camera = new THREE.PerspectiveCamera(
+  50, innerWidth / innerHeight, 0.1, 500
+);
+camera.position.set(0, 7, 20);
+camera.lookAt(0, 1.5, 0);
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  powerPreference: "high-performance"
+});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x465044, 2));
+
+const sunlight = new THREE.DirectionalLight(0xffffff, 2.2);
+sunlight.position.set(-8, 15, 10);
+scene.add(sunlight);
+
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(35, 18),
+  new THREE.MeshStandardMaterial({
+    color: 0x596052,
+    roughness: 1
+  })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.03;
+scene.add(floor);
+
+scene.add(new THREE.GridHelper(35, 35, 0x879080, 0x626b60));
+
+const display = new THREE.Group();
+scene.add(display);
+
+const assets = [
+  ["Fortified Outpost", "fortified_outpost.glb"],
+  ["Scots Pine Old", "scots_pine_old.glb"],
+  ["Sandbag Wall", "sandbag_wall.glb"]
+];
+
+const loader = new THREE.GLTFLoader();
+let completed = 0;
+const info = document.getElementById("info");
+
+assets.forEach((asset, index) => {
+  loader.load(
+    asset[1],
+    function(gltf) {
+      const model = gltf.scene;
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      const center = bounds.getCenter(new THREE.Vector3());
+      const maxSize = Math.max(size.x, size.y, size.z) || 1;
+      const scale = 4 / maxSize;
+
+      model.scale.setScalar(scale);
+      model.position.set(
+        (index - 1) * 5 - center.x * scale,
+        -bounds.min.y * scale,
+        -center.z * scale
+      );
+
+      display.add(model);
+      completed++;
+      info.textContent =
+        "WARDOGS — Berhasil dimuat: " + completed + "/3 | " + asset[0];
+    },
+    undefined,
+    function(error) {
+      console.error(asset[0], error);
+      completed++;
+      info.textContent =
+        "Gagal memuat " + asset[0] + " — periksa console";
+    }
+  );
+});
+
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
+
+renderer.domElement.addEventListener("pointerdown", e => {
+  dragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
+window.addEventListener("pointerup", () => dragging = false);
+
+window.addEventListener("pointermove", e => {
+  if (!dragging) return;
+  display.rotation.y += (e.clientX - lastX) * 0.008;
+  display.rotation.x += (e.clientY - lastY) * 0.004;
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
