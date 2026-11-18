@@ -1905,6 +1905,7 @@ renderer.outputEncoding = THREE.sRGBEncoding;
     }
 
     function initBots() {
+      return; // WARDOGS MAP BUILD: bot spawning disabled
       // 4 Blue Allies + 5 Red Enemies + 5 Gold Enemies = 14 AI Bots
       const roster = [
         { faction: 'blue', name: 'Cobalt_Alpha' },
@@ -1949,7 +1950,7 @@ renderer.outputEncoding = THREE.sRGBEncoding;
       });
     }
 
-    initBots();
+    // BOT SYSTEM DISABLED: MAP DEVELOPMENT PHASE
 
 
     // WARDOGS_SOLDIER_DIAGNOSTIC
@@ -1993,7 +1994,7 @@ document.body.appendChild(soldierDebugPanel);
     const GRASS_GRID = 12;
     const GRASS_RENDER_DISTANCE = 420;
     const GRASS_VISIBILITY_INTERVAL = 650;
-    const GRASS_INSTANCE_CAPACITY = 4096;
+    const GRASS_INSTANCE_CAPACITY = 8192;
     const GRASS_VARIANT_COUNT = 17;
 
     let grassLoaded = false;
@@ -2103,16 +2104,17 @@ document.body.appendChild(soldierDebugPanel);
       return true;
     }
 
+    let grassBatchDirty = true;
+    let grassStatsLastLog = 0;
+
     function buildGrassChunk(cx, cz) {
       const key = cx + ',' + cz;
       if (grassChunks.has(key) || !grassLoaded) return;
 
-      const positions = [];
-      const normals = [];
-      const uvs = [];
-      const colors = [];
-      const indices = [];
-      let vertexOffset = 0;
+      const variants = Array.from(
+        { length: GRASS_VARIANT_COUNT },
+        () => []
+      );
 
       const originX = cx * GRASS_CHUNK_SIZE;
       const originZ = cz * GRASS_CHUNK_SIZE;
@@ -2133,12 +2135,11 @@ document.body.appendChild(soldierDebugPanel);
 
           if (Math.abs(x) > 1218 || Math.abs(z) > 1218) continue;
 
-          // Varian low-poly: 11 sampai 16.
           const variant = Math.floor(
             grassRandom(seed + 2) * GRASS_VARIANT_COUNT
           );
-          const sourceGeometry = grassGeometries[variant];
-          if (!sourceGeometry) continue;
+
+          if (!grassGeometries[variant]) continue;
 
           const left = getTerrainHeight(x - 0.75, z);
           const right = getTerrainHeight(x + 0.75, z);
@@ -2152,6 +2153,7 @@ document.body.appendChild(soldierDebugPanel);
           grassDummy.position.set(
             x, getTerrainHeight(x, z) + 0.025, z
           );
+
           grassDummy.quaternion.setFromUnitVectors(
             grassUp, grassNormal
           );
@@ -2159,12 +2161,14 @@ document.body.appendChild(soldierDebugPanel);
           grassYaw.setFromAxisAngle(
             grassUp, grassRandom(seed + 3) * Math.PI * 2
           );
+
           grassDummy.quaternion.multiply(grassYaw);
 
           const isTiny = variant >= 11;
           const width = isTiny
             ? 12 + grassRandom(seed + 4) * 6
             : 4.5 + grassRandom(seed + 4) * 2.5;
+
           const height = isTiny
             ? 16 + grassRandom(seed + 5) * 12
             : 5 + grassRandom(seed + 5) * 3;
@@ -2172,87 +2176,93 @@ document.body.appendChild(soldierDebugPanel);
           grassDummy.scale.set(width, height, width);
           grassDummy.updateMatrix();
 
-          // Transform langsung dari geometri sumber tanpa clone sementara.
-          const pos = sourceGeometry.getAttribute('position');
-          const norm = sourceGeometry.getAttribute('normal');
-          const uv = sourceGeometry.getAttribute('uv');
-          const index = sourceGeometry.getIndex();
-          grassNormalMatrix.getNormalMatrix(grassDummy.matrix);
-
           const tint = grassRandom(seed + 6);
-          const redTint = 0.72 + tint * 0.28;
-          const greenTint = 0.80 + grassRandom(seed + 7) * 0.20;
-          const blueTint = 0.68 + grassRandom(seed + 8) * 0.27;
 
-          for (let i = 0; i < pos.count; i++) {
-            grassVertex.fromBufferAttribute(pos, i);
-            grassVertex.applyMatrix4(grassDummy.matrix);
-            positions.push(grassVertex.x, grassVertex.y, grassVertex.z);
-
-            if (norm) {
-              grassVertexNormal.fromBufferAttribute(norm, i);
-              grassVertexNormal.applyMatrix3(grassNormalMatrix).normalize();
-              normals.push(
-                grassVertexNormal.x,
-                grassVertexNormal.y,
-                grassVertexNormal.z
-              );
-            } else {
-              normals.push(0, 1, 0);
-            }
-
-            if (uv) {
-              uvs.push(uv.getX(i), uv.getY(i));
-            } else {
-              uvs.push(0, 0);
-            }
-
-            colors.push(redTint, greenTint, blueTint);
-          }
-
-          if (index) {
-            for (let i = 0; i < index.count; i++) {
-              indices.push(index.getX(i) + vertexOffset);
-            }
-          } else {
-            for (let i = 0; i < pos.count; i++) {
-              indices.push(i + vertexOffset);
-            }
-          }
-
-          vertexOffset += pos.count;
+          variants[variant].push({
+            matrix: grassDummy.matrix.clone(),
+            r: 0.72 + tint * 0.28,
+            g: 0.80 + grassRandom(seed + 7) * 0.20,
+            b: 0.68 + grassRandom(seed + 8) * 0.27
+          });
         }
       }
 
-      if (!positions.length) return;
-
-      const merged = new THREE.BufferGeometry();
-      merged.setAttribute(
-        'position', new THREE.Float32BufferAttribute(positions, 3)
-      );
-      merged.setAttribute(
-        'normal', new THREE.Float32BufferAttribute(normals, 3)
-      );
-      merged.setAttribute(
-        'uv', new THREE.Float32BufferAttribute(uvs, 2)
-      );
-      merged.setAttribute(
-        'color', new THREE.Float32BufferAttribute(colors, 3)
-      );
-      merged.setIndex(indices);
-      merged.computeBoundingSphere();
-
-      const mesh = new THREE.Mesh(merged, grassSharedMaterial);
-      mesh.name = 'WARDOGS_GRASS_CHUNK_' + key;
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-
-      grassRoot.add(mesh);
-      grassChunks.set(key, { mesh });
+      grassChunks.set(key, { variants });
+      grassBatchDirty = true;
     }
 
     function uploadVisibleGrass() {
-      // Chunk sudah digabung menjadi mesh saat dibangun.
+      if (!grassBatchDirty || grassMeshes.length === 0) return;
+
+      const counts = new Uint32Array(GRASS_VARIANT_COUNT);
+      const overflow = new Uint32Array(GRASS_VARIANT_COUNT);
+
+      for (const mesh of grassMeshes) {
+        mesh.count = 0;
+      }
+
+      for (const key of grassVisibleKeys) {
+        const chunk = grassChunks.get(key);
+        if (!chunk) continue;
+
+        for (let variant = 0; variant < GRASS_VARIANT_COUNT; variant++) {
+          const mesh = grassMeshes[variant];
+          const instances = chunk.variants[variant];
+
+          if (!mesh || !instances.length) continue;
+
+          for (const instance of instances) {
+            const index = counts[variant];
+
+            if (index >= GRASS_INSTANCE_CAPACITY) {
+              overflow[variant]++;
+              continue;
+            }
+
+            mesh.setMatrixAt(index, instance.matrix);
+
+            grassColor.setRGB(
+              instance.r,
+              instance.g,
+              instance.b
+            );
+
+            mesh.setColorAt(index, grassColor);
+            counts[variant]++;
+          }
+        }
+      }
+
+      for (let i = 0; i < grassMeshes.length; i++) {
+        const mesh = grassMeshes[i];
+
+        mesh.count = counts[i];
+        mesh.instanceMatrix.needsUpdate = true;
+
+        if (mesh.instanceColor) {
+          mesh.instanceColor.needsUpdate = true;
+        }
+      }
+
+      const overflowReport = [];
+
+      for (let i = 0; i < overflow.length; i++) {
+        if (overflow[i] > 0) {
+          overflowReport.push({
+            variant: i,
+            skipped: overflow[i]
+          });
+        }
+      }
+
+      if (overflowReport.length > 0) {
+        console.warn(
+          "[WARDOGS] GRASS INSTANCE OVERFLOW",
+          overflowReport
+        );
+      }
+
+      grassBatchDirty = false;
     }
 
     function loadArenaGrass() {
@@ -2351,20 +2361,49 @@ document.body.appendChild(soldierDebugPanel);
           const source = sourceMeshes[i];
           const geometry = source.geometry.clone();
 
-          const localTransform = new THREE.Matrix4().compose(
-            new THREE.Vector3(0, 0, 0),
-            source.quaternion,
-            source.scale
-          );
-
-          geometry.applyMatrix4(localTransform);
+          // Pertahankan pivot asli setiap variasi rumput dari GLB.
+          source.updateMatrix();
+          geometry.applyMatrix4(source.matrix);
           geometry.computeBoundingSphere();
 
+          // Instancing membutuhkan atribut warna vertex.
+          if (!geometry.getAttribute('color')) {
+            const vertexColors = new Float32Array(
+              geometry.getAttribute('position').count * 3
+            );
+            vertexColors.fill(1);
+            geometry.setAttribute(
+              'color',
+              new THREE.BufferAttribute(vertexColors, 3)
+            );
+          }
+
           grassGeometries.push(geometry);
-
-
         }
 
+        // Satu InstancedMesh global untuk setiap variasi rumput.
+        grassMeshes.length = 0;
+
+        for (let i = 0; i < GRASS_VARIANT_COUNT; i++) {
+          const mesh = new THREE.InstancedMesh(
+            grassGeometries[i],
+            grassSharedMaterial,
+            GRASS_INSTANCE_CAPACITY
+          );
+
+          mesh.name = 'WARDOGS_GRASS_INSTANCED_' + i;
+          mesh.count = 0;
+          mesh.castShadow = false;
+          mesh.receiveShadow = false;
+
+          // Visibilitas dikendalikan oleh sistem chunk kamera.
+          mesh.frustumCulled = false;
+
+          grassRoot.add(mesh);
+          grassMeshes.push(mesh);
+        }
+
+        grassBatchDirty = true;
         grassLoaded = true;
         grassLoading = false;
         grassLastVisibilityCheck = 0;
@@ -2411,6 +2450,9 @@ document.body.appendChild(soldierDebugPanel);
 
         grassFrustum.setFromProjectionMatrix(grassFrustumMatrix);
 
+        // Simpan daftar sebelumnya untuk mendeteksi perubahan visibilitas.
+        const previousVisibleKeys = new Set(grassVisibleKeys);
+
         grassVisibleKeys.clear();
         grassPendingChunks = [];
         grassPendingIndex = 0;
@@ -2436,15 +2478,29 @@ document.body.appendChild(soldierDebugPanel);
           }
         }
 
+        // Upload ulang hanya jika daftar chunk terlihat berubah.
+        let visibilityChanged =
+          previousVisibleKeys.size !== grassVisibleKeys.size;
+
+        if (!visibilityChanged) {
+          for (const key of grassVisibleKeys) {
+            if (!previousVisibleKeys.has(key)) {
+              visibilityChanged = true;
+              break;
+            }
+          }
+        }
+
+        if (visibilityChanged) {
+          grassBatchDirty = true;
+        }
+
         // Buang data chunk yang sudah tidak terlihat.
         for (const key of grassChunks.keys()) {
           if (!grassVisibleKeys.has(key)) {
             const oldChunk = grassChunks.get(key);
-            if (oldChunk && oldChunk.mesh) {
-              grassRoot.remove(oldChunk.mesh);
-              oldChunk.mesh.geometry.dispose();
-            }
             grassChunks.delete(key);
+            grassBatchDirty = true;
           }
         }
       }
@@ -2459,8 +2515,11 @@ document.body.appendChild(soldierDebugPanel);
       }
 
       if (
-        built > 0 ||
-        now - grassLastUpload >= 350
+        grassBatchDirty &&
+        (
+          grassPendingIndex >= grassPendingChunks.length ||
+          now - grassLastUpload >= 350
+        )
       ) {
         uploadVisibleGrass();
         grassLastUpload = now;
@@ -3754,13 +3813,12 @@ function createTrainingArenaUI() {
 
 
 function enterTrainingArena() {
+  return; // WARDOGS MAP BUILD: Training Arena temporarily disabled
   if (!state.isLobby || trainingArena.active) return;
 
-  if (!trainingBot && !createTrainingBot()) {
-    showLobbyToast('TRAINING SOLDIER IS NOT READY. TRY AGAIN.');
-    closeLobbyInteraction();
-    return;
-  }
+  showLobbyToast('TRAINING ARENA TEMPORARILY DISABLED. MAP DEVELOPMENT IN PROGRESS.');
+  closeLobbyInteraction();
+  return;
 
   trainingArena.returnPosition = camera.position.clone();
   trainingArena.returnRotation = camera.quaternion.clone();
@@ -5310,6 +5368,8 @@ function showLobbyInteraction(id) {
     // 15. AI BOT SIMULATION & KING OF THE HILL
     // ==========================================
     function updateBots(dt) {
+      for (const bot of bots) bot.group.visible = false;
+      return; // WARDOGS MAP BUILD: bot AI disabled
       const playerX = camera.position.x;
       const playerZ = camera.position.z;
       const coverMeshes = colliders.map(c => c.mesh);
@@ -5682,7 +5742,7 @@ function showLobbyInteraction(id) {
         updateLobbyInteractionPrompt();
       }
 
-      if (trainingArena.active) updateTrainingBot(dt);
+      // TRAINING BOT DISABLED: MAP DEVELOPMENT PHASE
 
       if (state.isPlaying && !state.isDead && !state.isGameOver) {
         const w = ARMORY.find(i => i.id === state.equippedWeaponId);
@@ -5784,7 +5844,7 @@ function showLobbyInteraction(id) {
         document.getElementById('ch-left').style.transform = `translateX(${-spreadPx}px)`;
         document.getElementById('ch-right').style.transform = `translateX(${spreadPx}px)`;
 
-        updateBots(dt);
+        // BOT AI DISABLED: MAP DEVELOPMENT PHASE
         updateControlZone(dt);
 
         // Refresh minimap at approximately 8 FPS instead of every frame.
@@ -5834,6 +5894,31 @@ function showLobbyInteraction(id) {
       );
 
       renderer.render(scene, camera);
+
+      // Monitor performa rumput tanpa render tambahan.
+      const grassStatsNow = performance.now();
+
+      if (grassStatsNow - grassStatsLastLog >= 2000) {
+        grassStatsLastLog = grassStatsNow;
+
+        let grassInstances = 0;
+        let activeGrassBatches = 0;
+
+        for (const mesh of grassMeshes) {
+          if (mesh.count > 0) {
+            grassInstances += mesh.count;
+            activeGrassBatches++;
+          }
+        }
+
+        console.info("[WARDOGS GRASS PERFORMANCE]", {
+          visibleChunks: grassVisibleKeys.size,
+          grassInstances,
+          activeGrassBatches,
+          totalDrawCalls: renderer.info.render.calls,
+          totalTriangles: renderer.info.render.triangles
+        });
+      }
     }
 
     window.onload = function () {
